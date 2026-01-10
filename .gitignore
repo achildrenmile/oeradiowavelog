@@ -1,0 +1,11 @@
+# Database backups (contain sensitive data)
+init/
+*.sql
+
+# Data directories
+uploads/
+userdata/
+backup/
+
+# Environment files
+.env

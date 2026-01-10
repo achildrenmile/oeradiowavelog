@@ -1,0 +1,54 @@
+services:
+  wavelog-db:
+    image: mariadb:11.3
+    container_name: wavelog-db
+    environment:
+      MARIADB_RANDOM_ROOT_PASSWORD: yes
+      MARIADB_DATABASE: wavelog
+      MARIADB_USER: wavelog
+      MARIADB_PASSWORD: WavelogPass123
+    volumes:
+      - wavelog-dbdata:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - wavelog-network
+
+  wavelog:
+    container_name: wavelog
+    image: ghcr.io/wavelog/wavelog:latest
+    depends_on:
+      wavelog-db:
+        condition: service_healthy
+    environment:
+      CI_ENV: docker
+    volumes:
+      - wavelog-config:/var/www/html/application/config/docker
+      - ./uploads:/var/www/html/uploads
+      - ./userdata:/var/www/html/userdata
+      - ./backup:/var/www/html/backup
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - wavelog-network
+
+volumes:
+  wavelog-dbdata:
+  wavelog-config:
+
+networks:
+  wavelog-network:
+    driver: bridge
