@@ -45,6 +45,22 @@ services:
     networks:
       - wavelog-network
 
+  wavelog-backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    container_name: wavelog-backup
+    depends_on:
+      wavelog-db:
+        condition: service_healthy
+    environment:
+      RETENTION_DAYS: 30
+    volumes:
+      - /backup:/backup
+    restart: unless-stopped
+    networks:
+      - wavelog-network
+
 volumes:
   wavelog-dbdata:
   wavelog-config:

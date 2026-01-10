@@ -1,0 +1,20 @@
+# Backup container with cron for Wavelog database
+FROM mariadb:11.3
+
+# Install cron
+RUN apt-get update && apt-get install -y cron && rm -rf /var/lib/apt/lists/*
+
+# Copy backup script
+COPY backup-db-internal.sh /backup-db.sh
+RUN chmod +x /backup-db.sh
+
+# Create cron job - daily at 3:00 AM
+RUN echo "0 3 * * * /backup-db.sh >> /var/log/backup.log 2>&1" > /etc/cron.d/wavelog-backup \
+    && chmod 0644 /etc/cron.d/wavelog-backup \
+    && crontab /etc/cron.d/wavelog-backup
+
+# Create log file
+RUN touch /var/log/backup.log
+
+# Start cron in foreground
+CMD ["cron", "-f"]

@@ -34,6 +34,7 @@ Docker deployment for Wavelog amateur radio logging software, migrated from Apac
 |-----------|-------|------|--------------|
 | wavelog | ghcr.io/wavelog/wavelog:latest | 80 | curl http://localhost/ |
 | wavelog-db | mariadb:11.3 | 3306 | healthcheck.sh --connect |
+| wavelog-backup | custom (Dockerfile.backup) | - | - |
 
 ## Data Persistence
 
@@ -86,6 +87,36 @@ Must contain:
 Location: `/var/www/html/application/config/docker/config.php`
 
 Copied from original installation at `/var/www/wavelog/application/config/config.php`
+
+## Automated Backups
+
+The `wavelog-backup` container handles daily backups.
+
+| Setting | Value |
+|---------|-------|
+| Schedule | Daily at 3:00 AM (cron inside container) |
+| Location | `/backup` (mounted from host) |
+| Retention | 30 days (configurable via RETENTION_DAYS env) |
+| Format | Compressed SQL (.sql.gz) |
+
+### Backup Files
+
+- `Dockerfile.backup` - Builds backup container with cron
+- `backup-db-internal.sh` - Backup script that runs inside container
+- `backup-db.sh` - Host-side backup script (alternative)
+
+### Manual Backup Commands
+
+```bash
+# Run backup from container
+docker exec wavelog-backup /backup-db.sh
+
+# View backup logs
+docker exec wavelog-backup cat /var/log/backup.log
+
+# Check cron schedule
+docker exec wavelog-backup crontab -l
+```
 
 ## Common Operations
 

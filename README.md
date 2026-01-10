@@ -10,6 +10,7 @@ Docker deployment for [Wavelog](https://www.wavelog.org/) amateur radio logging 
 |-----------|-------|------|---------|
 | wavelog | ghcr.io/wavelog/wavelog:latest | 80 | Wavelog web application |
 | wavelog-db | mariadb:11.3 | 3306 (internal) | MariaDB database |
+| wavelog-backup | custom (Dockerfile.backup) | - | Daily database backups |
 
 ## Quick Start
 
@@ -93,6 +94,46 @@ docker compose pull
 
 # Recreate container
 docker compose up -d
+```
+
+## Automated Backups
+
+The `wavelog-backup` container runs daily backups at **3:00 AM**.
+
+### Backup Configuration
+
+| Setting | Value |
+|---------|-------|
+| Schedule | Daily at 3:00 AM |
+| Location | `/backup` (host) |
+| Retention | 30 days |
+| Format | Compressed SQL (.sql.gz) |
+
+### Manual Backup
+
+```bash
+# Run backup manually
+docker exec wavelog-backup /backup-db.sh
+
+# View backup logs
+docker exec wavelog-backup cat /var/log/backup.log
+
+# List backups
+ls -la /backup/
+```
+
+### Restore from Backup
+
+```bash
+# Stop wavelog
+docker compose stop wavelog
+
+# Restore database
+gunzip -c /backup/wavelog_YYYYMMDD_HHMMSS.sql.gz | \
+  docker exec -i wavelog-db mariadb -u wavelog -pWavelogPass123 wavelog
+
+# Start wavelog
+docker compose start wavelog
 ```
 
 ## Database Operations
