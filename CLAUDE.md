@@ -9,6 +9,26 @@ Docker deployment for Wavelog amateur radio logging software, migrated from Apac
 - **Repository:** https://github.com/achildrenmile/oeradiowavelog
 - **Local Path:** /home/oe8yml/oeradiowavelog
 
+## Deployment
+
+### Production (Synology NAS)
+
+```bash
+# Deploy/update wavelog
+./deploy-production.sh
+```
+
+**Requirements:**
+- Copy `.env.production.example` to `.env.production` and configure
+- SSH access to Synology configured
+
+**Infrastructure:**
+- **Host**: Synology NAS
+- **Container**: `wavelog-synology` on port 3080
+- **Database**: `wavelog-db-synology` (MariaDB 11.3)
+- **Tunnel**: `cloudflared-oeradio` (shared with other oeradio.at services)
+- **Data**: `/volume1/docker/wavelog/`
+
 ## Architecture
 
 ```
@@ -51,10 +71,10 @@ Docker deployment for Wavelog amateur radio logging software, migrated from Apac
 
 | Setting | Value |
 |---------|-------|
-| Host | wavelog-db (inside Docker network) |
+| Host | wavelog-db-synology (inside Docker network) |
 | Database | wavelog |
 | User | wavelog |
-| Password | WavelogPass123 |
+| Password | (see docker-compose.yml) |
 | QSO Count | ~10,210 |
 
 ### Key Tables
@@ -75,13 +95,7 @@ Docker deployment for Wavelog amateur radio logging software, migrated from Apac
 ### Database Config (in container)
 Location: `/var/www/html/application/config/docker/database.php`
 
-Must contain:
-```php
-'hostname' => 'wavelog-db',
-'username' => 'wavelog',
-'password' => 'WavelogPass123',
-'database' => 'wavelog',
-```
+Must contain hostname pointing to the database container name (e.g., `wavelog-db-synology`).
 
 ### App Config (in container)
 Location: `/var/www/html/application/config/docker/config.php`
@@ -143,12 +157,11 @@ docker compose down && docker compose up -d
 
 ### Database Access
 ```bash
-# Shell access
-docker exec -it wavelog-db mariadb -u wavelog -pWavelogPass123 wavelog
+# Shell access (on Synology)
+ssh straliadmin@<SYNOLOGY_IP> '/usr/local/bin/docker exec -it wavelog-db-synology mariadb -u wavelog -p wavelog'
 
 # Run query
-docker exec wavelog-db mariadb -u wavelog -pWavelogPass123 wavelog \
-  -e "SELECT COUNT(*) FROM TABLE_HRD_CONTACTS_V01;"
+ssh straliadmin@<SYNOLOGY_IP> '/usr/local/bin/docker exec wavelog-db-synology mariadb -u wavelog -p wavelog -e "SELECT COUNT(*) FROM TABLE_HRD_CONTACTS_V01;"'
 ```
 
 ### Update Wavelog
@@ -159,36 +172,13 @@ docker compose up -d
 
 ### Backup Database
 ```bash
-docker exec wavelog-db mariadb-dump -u wavelog -pWavelogPass123 wavelog \
-  > backup/wavelog_$(date +%Y%m%d).sql
+# On Synology
+ssh straliadmin@<SYNOLOGY_IP> '/usr/local/bin/docker exec wavelog-db-synology mariadb-dump -u wavelog -p wavelog > /volume1/docker/wavelog/backup/wavelog_$(date +%Y%m%d).sql'
 ```
 
 ### Copy Config to Container
-After recreating containers with new volumes:
-```bash
-# Create database.php
-cat > /tmp/database.php << 'EOF'
-<?php
-defined('BASEPATH') OR exit('No direct script access allowed');
-$active_group = 'default';
-$query_builder = TRUE;
-$db['default'] = array(
-    'hostname' => 'wavelog-db',
-    'username' => 'wavelog',
-    'password' => 'WavelogPass123',
-    'database' => 'wavelog',
-    'dbdriver' => 'mysqli',
-    'char_set' => 'utf8mb4',
-    'dbcollat' => 'utf8mb4_general_ci',
-    // ... other settings
-);
-EOF
-
-docker cp /tmp/database.php wavelog:/var/www/html/application/config/docker/
-docker cp /var/www/wavelog/application/config/config.php \
-  wavelog:/var/www/html/application/config/docker/
-docker exec wavelog chown -R www-data:www-data /var/www/html/application/config/docker/
-```
+After recreating containers, the database.php config needs to be copied to the container.
+The config is stored in the `wavelog-config` Docker volume and persists across container restarts.
 
 ## Cloudflare Tunnel
 
