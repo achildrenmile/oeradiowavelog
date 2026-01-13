@@ -9,3 +9,4 @@ backup/
 
 # Environment files
 .env
+.env.production
